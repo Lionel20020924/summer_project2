@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../chat_list/controllers/chat_list_controller.dart';
+import '../../../services/openai_service.dart';
 
 class Message {
   final String id;
   final String content;
   final bool isFromMe;
   final DateTime timestamp;
+  final bool isError;
 
   Message({
     required this.id,
     required this.content,
     required this.isFromMe,
     required this.timestamp,
+    this.isError = false,
   });
 }
 
@@ -22,6 +25,7 @@ class ChatController extends GetxController {
   
   var messages = <Message>[].obs;
   var isLoading = false.obs;
+  var isSending = false.obs;
   var currentChat = Rxn<ChatItem>();
 
   @override
@@ -34,33 +38,23 @@ class ChatController extends GetxController {
   void loadMessages() async {
     isLoading.value = true;
     
+    // 检查网络连接
+    try {
+      final networkStatus = await OpenAIService.getNetworkStatus();
+      print('网络状态: $networkStatus');
+    } catch (e) {
+      print('网络检查失败: $e');
+    }
+    
     // 模拟加载历史消息
     await Future.delayed(Duration(seconds: 1));
     
     messages.value = [
       Message(
         id: '1',
-        content: '你好！',
+        content: '你好！我是 AI 助手，有什么可以帮助您的吗？\n\n💡 如果遇到网络问题，可以在右上角菜单中使用"网络诊断"功能。',
         isFromMe: false,
-        timestamp: DateTime.now().subtract(Duration(hours: 2)),
-      ),
-      Message(
-        id: '2',
-        content: '你好，很高兴和你聊天',
-        isFromMe: true,
-        timestamp: DateTime.now().subtract(Duration(hours: 1, minutes: 30)),
-      ),
-      Message(
-        id: '3',
-        content: '最近怎么样？',
-        isFromMe: false,
-        timestamp: DateTime.now().subtract(Duration(minutes: 30)),
-      ),
-      Message(
-        id: '4',
-        content: '还不错，工作挺忙的',
-        isFromMe: true,
-        timestamp: DateTime.now().subtract(Duration(minutes: 15)),
+        timestamp: DateTime.now().subtract(Duration(minutes: 1)),
       ),
     ];
     
@@ -70,41 +64,55 @@ class ChatController extends GetxController {
 
   void sendMessage() async {
     final content = messageController.text.trim();
-    if (content.isEmpty) return;
+    if (content.isEmpty || isSending.value) return;
 
-    // 添加我发送的消息
-    final myMessage = Message(
+    // 添加用户发送的消息
+    final userMessage = Message(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       content: content,
       isFromMe: true,
       timestamp: DateTime.now(),
     );
     
-    messages.add(myMessage);
+    messages.add(userMessage);
     messageController.clear();
     scrollToBottom();
 
-    // 模拟对方回复
-    await Future.delayed(Duration(seconds: 2));
-    final replies = [
-      '好的，我知道了',
-      '哈哈，有趣',
-      '确实是这样',
-      '我也这么认为',
-      '说得对',
-      '👍',
-      '好主意！',
-    ];
-    
-    final replyMessage = Message(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      content: replies[DateTime.now().millisecond % replies.length],
-      isFromMe: false,
-      timestamp: DateTime.now(),
-    );
-    
-    messages.add(replyMessage);
-    scrollToBottom();
+    // 设置发送状态
+    isSending.value = true;
+
+    try {
+      // 调用 OpenAI API 获取回复
+      final aiReply = await OpenAIService.sendMessage(content);
+      
+      // 添加 AI 回复消息
+      final replyMessage = Message(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        content: aiReply,
+        isFromMe: false,
+        timestamp: DateTime.now(),
+        isError: aiReply.contains('❌') || aiReply.contains('⚠️') || aiReply.contains('⏰') || aiReply.contains('💳'),
+      );
+      
+      messages.add(replyMessage);
+      scrollToBottom();
+    } catch (e) {
+      print('发送消息错误: $e');
+      
+      // 添加错误消息
+      final errorMessage = Message(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        content: '抱歉，发送消息时出现错误，请稍后重试。',
+        isFromMe: false,
+        timestamp: DateTime.now(),
+        isError: true,
+      );
+      
+      messages.add(errorMessage);
+      scrollToBottom();
+    } finally {
+      isSending.value = false;
+    }
   }
 
   void scrollToBottom() {
@@ -129,6 +137,30 @@ class ChatController extends GetxController {
     } else {
       return '${time.month}月${time.day}日 ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
     }
+  }
+
+  void clearHistory() {
+    Get.dialog(
+      AlertDialog(
+        title: Text('清除聊天记录'),
+        content: Text('确定要清除所有聊天记录吗？此操作无法撤销。'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              messages.clear();
+              OpenAIService.clearHistory();
+              Get.back();
+              Get.snackbar('成功', '聊天记录已清除');
+            },
+            child: Text('确定', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

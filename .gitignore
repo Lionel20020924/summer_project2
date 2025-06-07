@@ -43,3 +43,31 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Environment Configuration Files
+# IMPORTANT: Keep sensitive information out of version control
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# API Keys and Secrets
+*.key
+*.pem
+secrets/
+config/secrets.dart
+config/keys.dart
+
+# Local Configuration
+local.properties
+keystore.properties
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log

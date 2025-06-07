@@ -74,7 +74,18 @@ class ChatListController extends GetxController {
   }
 
   void openChat(ChatItem item) {
-    Get.toNamed(AppRoutes.CHAT, arguments: item);
+    // 现在所有聊天都是与 AI 助手对话
+    // 创建一个 AI 助手的聊天项传递给聊天页面
+    final aiChatItem = ChatItem(
+      id: 'ai_assistant',
+      name: 'AI 助手',
+      avatar: '🤖',
+      lastMessage: '我是您的智能助手，有什么可以帮助您的吗？',
+      time: '现在',
+      unreadCount: 0,
+    );
+    
+    Get.toNamed(AppRoutes.CHAT, arguments: aiChatItem);
   }
 
   void logout() {
