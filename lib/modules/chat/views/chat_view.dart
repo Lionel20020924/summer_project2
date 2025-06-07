@@ -416,18 +416,28 @@ class ChatView extends GetView<ChatController> {
                           ),
                         ],
                       ),
-                      child: Text(
-                        message.content,
-                        style: TextStyle(
-                          color: message.isFromMe 
-                              ? Colors.white 
-                              : message.isError 
-                                  ? Colors.red.shade300
-                                  : Colors.white.withOpacity(0.9),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          height: 1.4,
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            message.content,
+                            style: TextStyle(
+                              color: message.isFromMe 
+                                  ? Colors.white 
+                                  : message.isError 
+                                      ? Colors.red.shade300
+                                      : Colors.white.withOpacity(0.9),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              height: 1.4,
+                            ),
+                          ),
+                          // 添加语音播放按钮（仅对AI回复显示）
+                          if (!message.isFromMe && !message.isError) ...[
+                            SizedBox(height: 12),
+                            _buildAudioControls(message),
+                          ],
+                        ],
                       ),
                     ),
                   ),
@@ -784,6 +794,28 @@ class ChatView extends GetView<ChatController> {
                   },
                 ),
                 _buildModernOptionTile(
+                  icon: Icons.record_voice_over_rounded,
+                  title: 'ElevenLabs 配置',
+                  subtitle: '语音服务配置和测试',
+                  onTap: () {
+                    Get.back();
+                    _showElevenLabsConfigDialog();
+                  },
+                ),
+                // 🎵 新增自动语音播放切换选项
+                Obx(() => _buildModernOptionTile(
+                  icon: controller.autoPlayVoice.value 
+                      ? Icons.volume_up_rounded 
+                      : Icons.volume_off_rounded,
+                  title: controller.autoPlayVoiceStatusText,
+                  subtitle: controller.autoPlayVoice.value 
+                      ? 'AI回复将自动播放语音' 
+                      : '点击切换开启自动语音播放',
+                  onTap: () {
+                    controller.toggleAutoPlayVoice();
+                  },
+                )),
+                _buildModernOptionTile(
                   icon: Icons.clear_all_rounded,
                   title: '清除聊天记录',
                   subtitle: '删除所有对话历史',
@@ -1059,6 +1091,165 @@ class ChatView extends GetView<ChatController> {
     );
   }
 
+  void _showElevenLabsConfigDialog() {
+    Get.dialog(
+      ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: AlertDialog(
+            backgroundColor: Colors.transparent,
+            contentPadding: EdgeInsets.zero,
+            content: Container(
+              padding: EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withOpacity(0.3),
+                    Colors.white.withOpacity(0.2),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.record_voice_over_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      SizedBox(width: 12),
+                      Text(
+                        'ElevenLabs 语音配置',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    '语音合成服务状态：',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.black.withOpacity(0.2),
+                          Colors.black.withOpacity(0.1),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('• API Key: 未配置 ❌', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12, fontFamily: 'monospace')),
+                        Text('• Voice ID: pNInz6obpgDQGcFmaJgB (Adam)', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12, fontFamily: 'monospace')),
+                        Text('• Model: eleven_multilingual_v2', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12, fontFamily: 'monospace')),
+                        Text('• 多语言支持: 中文/英文 ✅', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12, fontFamily: 'monospace')),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    '配置步骤：',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text('1. 访问 https://elevenlabs.io/ 注册账户', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
+                  Text('2. 在个人资料页面获取 API Key', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
+                  Text('3. 在项目根目录的 .env 文件中设置：', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
+                  SizedBox(height: 4),
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'ELEVENLABS_API_KEY=your_actual_api_key_here',
+                      style: TextStyle(
+                        color: Colors.green.withOpacity(0.8),
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text('4. 重新启动应用', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
+                  SizedBox(height: 16),
+                  Text(
+                    '💡 免费用户每月有 10,000 字符的免费额度',
+                    style: TextStyle(
+                      color: Colors.yellow.withOpacity(0.8),
+                      fontSize: 12,
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () async {
+                          Get.back();
+                          // 这里可以添加测试TTS功能
+                          Get.snackbar('测试', '🎵 测试TTS功能...');
+                          // await controller.generateAndPlayAudio('test', '这是一个语音测试。');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text('测试语音', style: TextStyle(color: Colors.white, fontSize: 12)),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Get.back(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text('确定', style: TextStyle(color: Colors.white, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showNetworkDiagnostics() async {
     // 显示现代化加载对话框
     Get.dialog(
@@ -1304,5 +1495,117 @@ class ChatView extends GetView<ChatController> {
         ),
       );
     }
+  }
+
+  /// 构建音频控制按钮
+  Widget _buildAudioControls(Message message) {
+    return Obx(() {
+      final audioService = controller.audioService;
+      final isGenerating = controller.audioGeneratingMessageIds.contains(message.id);
+      final isPlaying = audioService.isPlayingMessage(message.id);
+      final isPaused = audioService.isPausedMessage(message.id);
+      
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.white.withOpacity(0.2),
+              Colors.white.withOpacity(0.1),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 播放/暂停按钮
+            GestureDetector(
+              onTap: isGenerating ? null : () {
+                controller.toggleAudioPlayback(message.id, message.audioFilePath);
+              },
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isGenerating 
+                        ? [Colors.grey.withOpacity(0.5), Colors.grey.withOpacity(0.3)]
+                        : [Colors.blue.withOpacity(0.7), Colors.purple.withOpacity(0.5)],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: isGenerating
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Icon(
+                          isPlaying 
+                              ? Icons.pause_rounded 
+                              : isPaused 
+                                  ? Icons.play_arrow_rounded
+                                  : Icons.volume_up_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                ),
+              ),
+            ),
+            
+            // 显示播放进度（如果正在播放）
+            if (isPlaying || isPaused) ...[
+              SizedBox(width: 8),
+              Text(
+                audioService.formatDuration(audioService.currentPosition.value),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 12,
+                ),
+              ),
+              if (audioService.totalDuration.value.inSeconds > 0) ...[
+                Text(
+                  ' / ${audioService.formatDuration(audioService.totalDuration.value)}',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
+            
+            // 状态文本
+            if (!isPlaying && !isPaused && !isGenerating) ...[
+              SizedBox(width: 6),
+              Text(
+                message.audioFilePath != null ? '重播' : '语音',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ] else if (isGenerating) ...[
+              SizedBox(width: 6),
+              Text(
+                '生成中...',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    });
   }
 } 
