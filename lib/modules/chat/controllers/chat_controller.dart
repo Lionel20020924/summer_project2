@@ -26,6 +26,7 @@ class ChatController extends GetxController {
   var messages = <Message>[].obs;
   var isLoading = false.obs;
   var isSending = false.obs;
+  var isTyping = false.obs;
   var currentChat = Rxn<ChatItem>();
 
   @override
@@ -80,29 +81,71 @@ class ChatController extends GetxController {
 
     // 设置发送状态
     isSending.value = true;
+    isTyping.value = true;
 
     try {
-      // 调用 OpenAI API 获取回复
-      final aiReply = await OpenAIService.sendMessage(content);
-      
-      // 添加 AI 回复消息
+      // 创建AI回复消息（初始显示正在输入...）
+      final aiMessageId = DateTime.now().millisecondsSinceEpoch.toString();
       final replyMessage = Message(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        content: aiReply,
+        id: aiMessageId,
+        content: '正在思考中...',
         isFromMe: false,
         timestamp: DateTime.now(),
-        isError: aiReply.contains('❌') || aiReply.contains('⚠️') || aiReply.contains('⏰') || aiReply.contains('💳'),
       );
       
       messages.add(replyMessage);
       scrollToBottom();
+
+      // 使用流式API获取回复
+      String fullResponse = '';
+      bool isFirstChunk = true;
+      
+      await for (final chunk in OpenAIService.sendMessageStream(content)) {
+        if (isFirstChunk) {
+          isTyping.value = false;
+          fullResponse = chunk;
+          isFirstChunk = false;
+        } else {
+          fullResponse += chunk;
+        }
+        
+        // 检查是否是错误消息
+        final isError = fullResponse.contains('❌') || 
+                       fullResponse.contains('⚠️') || 
+                       fullResponse.contains('⏰') || 
+                       fullResponse.contains('💳');
+        
+        // 更新消息内容
+        final messageIndex = messages.indexWhere((msg) => msg.id == aiMessageId);
+        if (messageIndex != -1) {
+          messages[messageIndex] = Message(
+            id: aiMessageId,
+            content: fullResponse,
+            isFromMe: false,
+            timestamp: DateTime.now(),
+            isError: isError,
+          );
+          
+          // 智能滚动：只在消息变长时滚动
+          if (fullResponse.length % 30 == 0) {
+            scrollToBottom();
+          }
+        }
+      }
+      
+      // 最终滚动到底部
+      scrollToBottom();
+      
     } catch (e) {
       print('发送消息错误: $e');
+      
+      // 移除"正在思考中..."的消息
+      messages.removeWhere((msg) => msg.content == '正在思考中...');
       
       // 添加错误消息
       final errorMessage = Message(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        content: '抱歉，发送消息时出现错误，请稍后重试。',
+        content: '抱歉，发送消息时出现错误，请稍后重试。\n\n错误详情: ${e.toString()}',
         isFromMe: false,
         timestamp: DateTime.now(),
         isError: true,
@@ -112,7 +155,18 @@ class ChatController extends GetxController {
       scrollToBottom();
     } finally {
       isSending.value = false;
+      isTyping.value = false;
     }
+  }
+
+  void retrySendMessage(String content) {
+    messageController.text = content;
+    sendMessage();
+  }
+
+  void stopGeneration() {
+    isSending.value = false;
+    isTyping.value = false;
   }
 
   void scrollToBottom() {
